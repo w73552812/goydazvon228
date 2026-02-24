@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Voice Control</title>
+    <title>GoydaZvon | Account System</title>
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.18.0.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -12,27 +12,28 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .window { background: var(--card); padding: 30px; border-radius: 25px; width: 350px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         h1 { color: var(--primary); letter-spacing: 2px; margin: 0 0 20px; }
-        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
-        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; transition: 0.3s; }
+        .label { text-align: left; font-size: 0.8rem; color: #94a3b8; margin-bottom: 5px; margin-left: 5px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
+        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
-        .user-card { background: #0f172a; padding: 20px; border-radius: 20px; border: 3px solid transparent; transition: 0.3s; }
+        .user-card { background: #0f172a; padding: 20px; border-radius: 20px; border: 3px solid transparent; transition: 0.3s; position: relative; }
         .user-card.speaking { border-color: var(--success); box-shadow: 0 0 15px rgba(34, 197, 94, 0.3); }
-        .username { font-weight: bold; font-size: 0.9rem; margin-top: 10px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
-        /* Стили для кнопок управления */
+        .username { font-weight: bold; font-size: 0.9rem; margin-top: 10px; color: #f1f5f9; }
         .controls { display: flex; gap: 10px; margin-top: 25px; }
-        .btn-mute { background: #475569; }
+        .btn-mute { background: #475569; flex: 1; }
         .btn-mute.muted { background: #ef4444; }
-        .btn-exit { background: #334155; }
+        .btn-exit { background: #334155; flex: 1; }
     </style>
 </head>
 <body>
 
 <div id="setup" class="window">
     <h1>GOYDAZVON</h1>
-    <input type="text" id="roomInput" placeholder="Комната" value="goyda1">
-    <input type="text" id="nameInput" placeholder="Твоё имя" value="Аноним">
-    <button onclick="join()">ВОЙТИ В КАНАЛ</button>
+    <div class="label">Название комнаты:</div>
+    <input type="text" id="roomInput" placeholder="goyda1" value="goyda1">
+    <div class="label">Ваше имя (русский поддерживается):</div>
+    <input type="text" id="nameInput" placeholder="Напр. Иван">
+    <button onclick="join()">ВОЙТИ В АККАУНТ</button>
 </div>
 
 <div id="room" class="window" style="display:none">
@@ -43,7 +44,6 @@
             <div class="username" id="local-name">Вы</div>
         </div>
     </div>
-    
     <div class="controls">
         <button id="muteBtn" class="btn-mute" onclick="toggleMute()">🎙️ Mute</button>
         <button class="btn-exit" onclick="location.reload()">❌ Выйти</button>
@@ -51,14 +51,21 @@
 </div>
 
 <script>
+    // 1. Конфиг (Берем твой Firebase и Agora)
     const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
     const APP_ID = "0a8621015fe0434698d14bd83b1fde91"; 
+
     const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     let localTracks = { audioTrack: null };
     let isMuted = false;
+
+    // СИСТЕМА АККАУНТОВ: Проверяем наличие сохраненного имени
+    window.onload = () => {
+        const savedName = localStorage.getItem('goyda_name');
+        if (savedName) document.getElementById('nameInput').value = savedName;
+    };
 
     function addUserCard(uid, name) {
         if (document.getElementById(`user-${uid}`)) return;
@@ -71,27 +78,22 @@
 
     async function toggleMute() {
         if (!localTracks.audioTrack) return;
-        
-        if (!isMuted) {
-            await localTracks.audioTrack.setEnabled(false);
-            isMuted = true;
-            document.getElementById('muteBtn').innerText = "🔇 Unmute";
-            document.getElementById('muteBtn').classList.add('muted');
-            document.getElementById('local-user').style.opacity = "0.5";
-        } else {
-            await localTracks.audioTrack.setEnabled(true);
-            isMuted = false;
-            document.getElementById('muteBtn').innerText = "🎙️ Mute";
-            document.getElementById('muteBtn').classList.remove('muted');
-            document.getElementById('local-user').style.opacity = "1";
-        }
+        isMuted = !isMuted;
+        await localTracks.audioTrack.setEnabled(!isMuted);
+        const btn = document.getElementById('muteBtn');
+        btn.innerText = isMuted ? "🔇 Unmute" : "🎙️ Mute";
+        btn.classList.toggle('muted', isMuted);
+        document.getElementById('local-user').style.opacity = isMuted ? "0.5" : "1";
     }
 
     async function join() {
         const room = document.getElementById('roomInput').value.trim();
         const myName = document.getElementById('nameInput').value.trim();
         
-        if (!room || !myName) return alert("Заполни все поля!");
+        if (!room || !myName) return alert("Введите имя и комнату!");
+
+        // Сохраняем имя в память браузера (Аккаунт)
+        localStorage.setItem('goyda_name', myName);
 
         document.getElementById('setup').style.display = 'none';
         document.getElementById('room').style.display = 'block';
@@ -101,15 +103,17 @@
         try {
             const uid = await client.join(APP_ID, room, null, null);
 
-            db.ref(`rooms/${room}/users`).once('value', (snapshot) => {
-                const users = snapshot.val();
+            // Синхронизация: Получаем имена тех, кто уже в сети
+            db.ref(`rooms/${room}/users`).once('value', (snap) => {
+                const users = snap.val();
                 if (users) {
-                    Object.keys(users).forEach(remoteUid => {
-                        if (remoteUid != uid) addUserCard(remoteUid, users[remoteUid].name);
+                    Object.keys(users).forEach(u => {
+                        if (u != uid) addUserCard(u, users[u].name);
                     });
                 }
             });
 
+            // Регистрация своего имени в Firebase
             db.ref(`rooms/${room}/users/${uid}`).set({ name: myName });
             db.ref(`rooms/${room}/users/${uid}`).onDisconnect().remove();
 
@@ -128,10 +132,11 @@
                 await client.subscribe(user, mediaType);
                 if (mediaType === "audio") {
                     user.audioTrack.play();
+                    // Ждем запись имени в БД другим юзером
                     setTimeout(() => {
-                        db.ref(`rooms/${room}/users/${user.uid}`).once('value', (snap) => {
-                            const data = snap.val();
-                            addUserCard(user.uid, data ? data.name : "Подключается...");
+                        db.ref(`rooms/${room}/users/${user.uid}`).once('value', (s) => {
+                            const d = s.val();
+                            addUserCard(user.uid, d ? d.name : "Пользователь");
                         });
                     }, 1500);
                 }
@@ -141,9 +146,9 @@
                 document.getElementById(`user-${user.uid}`)?.remove();
             });
 
-        } catch (error) {
-            console.error(error);
-            alert("Ошибка подключения!");
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка входа!");
         }
     }
 </script>
