@@ -3,46 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Custom Engine</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>GoydaZvon | Advanced Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --primary: #ef4444; --success: #22c55e; --text: #f1f5f9; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .window { background: var(--card); padding: 30px; border-radius: 24px; width: 350px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-        h1 { color: var(--primary); letter-spacing: 2px; margin-bottom: 25px; }
-        input { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
-        .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; }
-        .btn-primary { background: var(--primary); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-        .user { background: #0f172a; padding: 15px; border-radius: 15px; border: 2px solid transparent; transition: 0.3s; }
-        .user.speaking { border-color: var(--success); box-shadow: 0 0 15px rgba(34, 197, 94, 0.2); }
-        .controls { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-tool { background: #475569; flex: 1; font-size: 1.2rem; }
-        .btn-mute.active { background: var(--primary); }
+        :root { --bg: #0f172a; --primary: #ef4444; --success: #22c55e; --text: #f1f5f9; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .window { background: #1e293b; padding: 30px; border-radius: 24px; width: 350px; text-align: center; border: 1px solid #334155; }
+        h1 { color: var(--primary); letter-spacing: 2px; }
+        input { width: 100%; padding: 14px; margin: 15px 0; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .user-card { background: #0f172a; padding: 15px; border-radius: 15px; border: 2px solid transparent; }
+        .user-card.active { border-color: var(--success); }
     </style>
 </head>
 <body>
 
-<div id="setup-ui" class="window">
+<div id="setup" class="window">
     <h1>GOYDAZVON</h1>
-    <input type="text" id="roomInput" placeholder="Имя комнаты" value="goyda1">
-    <button class="btn btn-primary" onclick="startApp()">СОЗДАТЬ СВОЙ КАНАЛ</button>
+    <input type="text" id="roomName" placeholder="Комната" value="goyda1">
+    <button onclick="initCall()">ВОЙТИ В СЕТЬ</button>
 </div>
 
-<div id="room-ui" class="window" style="display:none">
-    <h2 id="roomTitle" style="margin-top:0"># комната</h2>
-    <div class="grid" id="userList">
-        <div class="user" id="my-card">
-            <div style="font-size:2.5rem">👤</div>
-            <div style="font-size:0.8rem; opacity: 0.6">ВЫ</div>
-        </div>
+<div id="room" class="window" style="display:none">
+    <h2 id="title"></h2>
+    <div class="user-grid" id="userList">
+        <div class="user-card" id="my-card">👤<br>ВЫ</div>
     </div>
-    <div class="controls">
-        <button id="mute-btn" class="btn btn-tool" onclick="toggleMute()">🎙️</button>
-        <button class="btn btn-tool" style="background:#334155" onclick="location.reload()">❌</button>
-    </div>
+    <button onclick="location.reload()" style="margin-top:20px; background:#475569">ВЫЙТИ</button>
 </div>
 
 <script>
@@ -50,92 +40,92 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let localStream, peer, audioCtx;
-    const activeCalls = {};
+    let myId = Math.random().toString(36).substr(2, 9);
+    let localStream;
+    let peers = {};
 
-    async function startApp() {
-        const room = document.getElementById('roomInput').value.trim();
-        if(!room) return alert("Введите имя!");
-
+    async function initCall() {
+        const room = document.getElementById('roomName').value;
         try {
-            // 1. Берем микрофон и сразу создаем AudioContext (для индикатора)
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            return alert("Нужен доступ к микрофону!");
-        }
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('room').style.display = 'block';
+            document.getElementById('title').innerText = "# " + room;
 
-        // 2. Настраиваем Peer с Google серверами (чтобы не было ошибок сети)
-        peer = new Peer(null, {
-            config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
-        });
+            const roomRef = db.ref('rooms/' + room);
 
-        peer.on('open', (id) => {
-            document.getElementById('setup-ui').style.display = 'none';
-            document.getElementById('room-ui').style.display = 'block';
-            document.getElementById('roomTitle').innerText = "# " + room;
+            // Сообщаем всем, что мы зашли
+            roomRef.child(myId).set({ active: true });
+            roomRef.child(myId).onDisconnect().remove();
 
-            const ref = db.ref('rooms/' + room);
-            ref.child(id).set(true);
-            ref.child(id).onDisconnect().remove();
-
-            ref.on('child_added', (snap) => {
-                if (snap.key !== id && !activeCalls[snap.key]) {
-                    const call = peer.call(snap.key, localStream);
-                    handleCall(call);
+            // Слушаем других участников
+            roomRef.on('child_added', snapshot => {
+                const userId = snapshot.key;
+                if (userId !== myId) {
+                    initPeer(userId, room, true); // Мы создаем предложение (initiator)
                 }
             });
-            setupVoiceVisual(localStream, 'my-card');
-        });
 
-        peer.on('call', (call) => {
-            call.answer(localStream);
-            handleCall(call);
-        });
+            // Слушаем сигналы (ответы)
+            db.ref('signals/' + myId).on('child_added', snapshot => {
+                const data = snapshot.val();
+                if (peers[data.from]) {
+                    peers[data.from].signal(data.signal);
+                } else {
+                    // Если нам пришел сигнал от того, кого мы еще не знаем — создаем пира (не инициатор)
+                    const p = initPeer(data.from, room, false);
+                    p.signal(data.signal);
+                }
+                snapshot.ref.remove();
+            });
+
+        } catch (e) { alert("Микрофон не доступен!"); }
     }
 
-    function handleCall(call) {
-        activeCalls[call.peer] = call;
-        call.on('stream', (stream) => {
-            if (!document.getElementById('audio-' + call.peer)) {
+    function initPeer(userId, room, initiator) {
+        if (peers[userId]) return peers[userId];
+
+        const p = new SimplePeer({
+            initiator: initiator,
+            stream: localStream,
+            trickle: false,
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+        });
+
+        p.on('signal', data => {
+            // Отправляем наш сигнал другому через Firebase
+            db.ref('signals/' + userId).push({
+                from: myId,
+                signal: data
+            });
+        });
+
+        p.on('stream', stream => {
+            if (!document.getElementById('v-' + userId)) {
                 const audio = new Audio();
-                audio.id = 'audio-' + call.peer;
+                audio.id = 'v-' + userId;
                 audio.srcObject = stream;
                 audio.play();
-
+                
                 const card = document.createElement('div');
-                card.id = 'card-' + call.peer;
-                card.className = 'user';
-                card.innerHTML = `<div style="font-size:2.5rem">📢</div><div style="font-size:0.7rem">${call.peer.substring(0,5)}</div>`;
+                card.className = 'user-card active';
+                card.id = 'c-' + userId;
+                card.innerHTML = "📢<br>" + userId.substr(0, 4);
                 document.getElementById('userList').appendChild(card);
-                setupVoiceVisual(stream, card.id);
             }
         });
+
+        p.on('close', () => removeUser(userId));
+        p.on('error', err => console.error('Peer error:', err));
+
+        peers[userId] = p;
+        return p;
     }
 
-    function setupVoiceVisual(stream, cardId) {
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-
-        function check() {
-            if (!document.getElementById(cardId)) return;
-            analyser.getByteFrequencyData(data);
-            const avg = data.reduce((a,b) => a+b) / data.length;
-            document.getElementById(cardId).classList.toggle('speaking', avg > 15);
-            requestAnimationFrame(check);
-        }
-        check();
-    }
-
-    function toggleMute() {
-        const track = localStream.getAudioTracks()[0];
-        track.enabled = !track.enabled;
-        const btn = document.getElementById('mute-btn');
-        btn.innerText = track.enabled ? "🎙️" : "🔇";
-        btn.classList.toggle('active', !track.enabled);
+    function removeUser(id) {
+        document.getElementById('c-' + id)?.remove();
+        document.getElementById('v-' + id)?.remove();
+        delete peers[id];
     }
 </script>
 </body>
