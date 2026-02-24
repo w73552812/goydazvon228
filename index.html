@@ -1,101 +1,103 @@
-const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoydaZvon Engine | Own Product</title>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.18.0.js"></script>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --primary: #ef4444; --success: #22c55e; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .window { background: var(--card); padding: 30px; border-radius: 25px; width: 350px; text-align: center; border: 1px solid #334155; }
+        h1 { color: var(--primary); letter-spacing: 2px; margin: 0 0 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
+        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+        .user-card { background: #0f172a; padding: 20px; border-radius: 20px; border: 3px solid transparent; transition: 0.3s; position: relative; }
+        .user-card.speaking { border-color: var(--success); box-shadow: 0 0 15px rgba(34, 197, 94, 0.3); }
+        .status { font-size: 0.7rem; opacity: 0.6; margin-top: 5px; }
+    </style>
+</head>
+<body>
 
-    // Генерируем ID и добавляем к нему метку устройства для отладки
-    let myId = (navigator.userAgent.match(/iPhone|Android/i) ? 'mob-' : 'pc-') + Math.random().toString(36).substr(2, 5);
-    let localStream;
-    let peers = {};
+<div id="setup" class="window">
+    <h1>GOYDAZVON</h1>
+    <input type="text" id="roomName" placeholder="Название комнаты" value="goyda1">
+    <button onclick="join()">ЗАПУСТИТЬ СЕРВИС</button>
+</div>
 
-    async function initCall() {
+<div id="room" class="window" style="display:none">
+    <h3 id="roomTitle"></h3>
+    <div class="user-grid" id="userList">
+        <div class="user-card" id="local-user">
+            <div style="font-size: 2.5rem;">👤</div>
+            <div class="status">ВЫ</div>
+        </div>
+    </div>
+    <button onclick="leave()" style="margin-top:25px; background:#475569">ВЫЙТИ</button>
+</div>
+
+<script>
+    // ТУТ ВСТАВЬ СВОЙ APP ID ИЗ КОНСОЛИ AGORA
+    const APP_ID = "0a8621015fe0434698d14bd83b1fde91"; 
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+    let localTracks = { audioTrack: null };
+
+    async function join() {
         const room = document.getElementById('roomName').value;
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('room').style.display = 'block';
-            document.getElementById('title').innerText = "# " + room;
+        if (!room) return alert("Введите имя комнаты!");
 
-            const roomRef = db.ref('rooms/' + room);
-            const signalRef = db.ref('signals/' + myId);
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('room').style.display = 'block';
+        document.getElementById('roomTitle').innerText = "# " + room;
 
-            // 1. Очищаем свои старые сигналы перед входом
-            await signalRef.remove();
+        // Присоединяемся к каналу
+        await client.join(APP_ID, room, null, null);
 
-            // 2. Регистрируем себя в комнате
-            roomRef.child(myId).set(true);
-            roomRef.child(myId).onDisconnect().remove();
+        // Создаем и публикуем звук
+        localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        await client.publish([localTracks.audioTrack]);
 
-            // 3. Когда кто-то ЗАХОДИТ (child_added)
-            roomRef.on('child_added', snapshot => {
-                const userId = snapshot.key;
-                // Инициатором будет тот, чей ID "меньше" по алфавиту (стандартный трюк WebRTC)
-                if (userId !== myId && !peers[userId]) {
-                    const isInitiator = myId < userId; 
-                    initPeer(userId, room, isInitiator);
-                }
-            });
-
-            // 4. Слушаем входящие сигналы
-            signalRef.on('child_added', snapshot => {
-                const data = snapshot.val();
-                if (peers[data.from]) {
-                    peers[data.from].signal(data.signal);
-                } else {
-                    // Если пира нет, создаем его (не инициатор, так как нам прислали сигнал)
-                    const p = initPeer(data.from, room, false);
-                    p.signal(data.signal);
-                }
-                snapshot.ref.remove(); // Удаляем обработанный сигнал
-            });
-
-        } catch (e) { alert("Ошибка микрофона: " + e.message); }
-    }
-
-    function initPeer(userId, room, initiator) {
-        console.log(`Создаю пир с ${userId}. Я инициатор: ${initiator}`);
-        
-        const p = new SimplePeer({
-            initiator: initiator,
-            stream: localStream,
-            trickle: false, // Для Firebase лучше false (один большой пакет данных)
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-        });
-
-        p.on('signal', data => {
-            // Отправляем сигнал напрямую в ветку получателя
-            db.ref('signals/' + userId).push({
-                from: myId,
-                signal: JSON.stringify(data) // Сериализуем для надежности
+        // Настраиваем индикатор громкости (пульсация карточки)
+        client.enableAudioVolumeIndicator();
+        client.on("volume-indicator", volumes => {
+            volumes.forEach(v => {
+                const id = v.uid === client.uid ? "local-user" : `user-${v.uid}`;
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('speaking', v.level > 10);
             });
         });
 
-        p.on('stream', stream => {
-            if (!document.getElementById('v-' + userId)) {
-                const audio = new Audio();
-                audio.id = 'v-' + userId;
-                audio.srcObject = stream;
-                audio.play();
-                
-                const card = document.createElement('div');
-                card.className = 'user-card active';
-                card.id = 'c-' + userId;
-                card.innerHTML = `📢<br><small>${userId}</small>`;
-                document.getElementById('userList').appendChild(card);
+        // Слушаем других участников
+        client.on("user-published", async (user, mediaType) => {
+            await client.subscribe(user, mediaType);
+            if (mediaType === "audio") {
+                user.audioTrack.play();
+                addUserCard(user.uid);
             }
         });
 
-        p.on('close', () => {
-            document.getElementById('c-' + userId)?.remove();
-            delete peers[userId];
+        client.on("user-left", (user) => {
+            document.getElementById(`user-${user.uid}`)?.remove();
         });
-
-        // Исправление: если пришел сигнал в виде строки, парсим его
-        const originalSignal = p.signal;
-        p.signal = function(data) {
-            if (typeof data === 'string') return originalSignal.call(this, JSON.parse(data));
-            return originalSignal.call(this, data);
-        };
-
-        peers[userId] = p;
-        return p;
     }
+
+    function addUserCard(uid) {
+        if (document.getElementById(`user-${uid}`)) return;
+        const card = document.createElement('div');
+        card.id = `user-${uid}`;
+        card.className = 'user-card';
+        card.innerHTML = `<div style="font-size: 2.5rem;">📢</div><div class="status">MAXIM</div>`;
+        document.getElementById('userList').appendChild(card);
+    }
+
+    async function leave() {
+        localTracks.audioTrack.stop();
+        localTracks.audioTrack.close();
+        await client.leave();
+        location.reload();
+    }
+</script>
+</body>
+</html>
