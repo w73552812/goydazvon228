@@ -180,8 +180,18 @@
         }
 
         // Создание PeerJS с обработкой ошибок
+        // Находим строку peer = new Peer(); и заменяем на это:
         peer = new Peer({
-            debug: 2 // Выводит ошибки в консоль (F12) для диагностики
+            host: '0.peerjs.com', // Используем конкретный сервер
+            port: 443,
+            secure: true,
+            debug: 3,
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
         });
 
         peer.on('open', (myId) => {
@@ -221,4 +231,5 @@
 </script>
 </body>
 </html>
+
 
