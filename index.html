@@ -2,234 +2,102 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Voice & Files</title>
-    
+    <title>GoydaZvon | Fixed</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
     <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --primary: #ef4444;
-            --success: #22c55e;
-            --text: #f1f5f9;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-
-        .window {
-            background: var(--card);
-            padding: 30px;
-            border-radius: 24px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            border: 1px solid #334155;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        h1 { color: var(--primary); letter-spacing: 2px; text-transform: uppercase; margin-top: 0; }
-        
-        input {
-            width: 100%;
-            padding: 14px;
-            margin: 20px 0;
-            border-radius: 12px;
-            border: 2px solid #334155;
-            background: #0f172a;
-            color: white;
-            box-sizing: border-box;
-            outline: none;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-            color: white;
-        }
-
-        .btn-primary { background: var(--primary); }
-
-        .user-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .user-card {
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 18px;
-            border: 3px solid transparent;
-            transition: 0.2s;
-        }
-
-        .user-card.speaking {
-            border-color: var(--success);
-            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .btn-tool { background: #475569; flex: 1; font-size: 1.2rem; }
-        .btn-mute.active { background: var(--primary); }
-
-        #error-log { color: #fca5a5; font-size: 0.8rem; margin-top: 10px; display: none; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
-        
-        .file-link {
-            display: block;
-            background: var(--success);
-            color: white;
-            text-decoration: none;
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 0.7rem;
-            margin-top: 5px;
-        }
+        :root { --bg: #0f172a; --primary: #ef4444; --text: #f1f5f9; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .window { background: #1e293b; padding: 30px; border-radius: 20px; width: 320px; text-align: center; border: 1px solid #334155; }
+        input { width: 100%; padding: 12px; margin: 15px 0; border-radius: 8px; border: none; background: #0f172a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+        .user-card { background: #0f172a; padding: 10px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--primary); }
     </style>
 </head>
 <body>
 
-<div class="window" id="setup-ui">
+<div class="window" id="setup">
     <h1>GOYDAZVON</h1>
-    <input type="text" id="roomInput" placeholder="Комната" value="goyda1">
-    <button class="btn btn-primary" onclick="startGoyda()">ВОЙТИ В ГОЛОС</button>
-    <div id="error-log"></div>
+    <input type="text" id="roomName" placeholder="Комната" value="goyda1">
+    <button onclick="startGoyda()">ВОЙТИ</button>
 </div>
 
-<div class="window" id="room-ui" style="display:none">
-    <h2 id="roomTitle" style="margin: 0;"></h2>
-    <div id="userList" class="user-grid">
-        <div class="user-card" id="my-card">
-            <div style="font-size:2rem">👤</div>
-            <div style="font-size:0.8rem">ВЫ</div>
-        </div>
-    </div>
-    
-    <div class="controls">
-        <button id="mute-btn" class="btn btn-tool" onclick="toggleMute()">🎙️</button>
-        <label class="btn btn-tool" style="cursor:pointer">
-            📎 <input type="file" id="fileInput" onchange="sendFile()" style="display:none">
-        </label>
-        <button class="btn btn-tool" style="background:#334155" onclick="location.reload()">❌</button>
-    </div>
+<div class="window" id="room" style="display:none">
+    <h3 id="title"></h3>
+    <div id="userList"></div>
+    <button onclick="location.reload()" style="margin-top:20px; background:#475569">ВЫЙТИ</button>
 </div>
 
 <script>
-    // 1. Инициализация Firebase с проверкой
-    const firebaseConfig = {
-        databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/"
-    };
-
-    try {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-    } catch (e) {
-        console.error("Firebase init error:", e);
-    }
-    
+    const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    let localStream, peer, audioContext, isMuted = false;
+
+    let localStream, peer;
     const activeCalls = {};
 
     async function startGoyda() {
-        const btn = document.querySelector('.btn-primary');
-        const roomName = document.getElementById('roomInput').value.trim();
-        
-        if(!roomName) return alert("Введите название комнаты!");
-
-        // Визуальный отклик
-        btn.innerText = "ПОДКЛЮЧЕНИЕ...";
-        btn.disabled = true;
-
+        const room = document.getElementById('roomName').value;
         try {
-            // Активация звукового движка (важно для Chrome/Safari)
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') await audioContext.resume();
-
-            // Запрос микрофона
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-            btn.innerText = "ОШИБКА";
-            btn.disabled = false;
-            alert("Нет доступа к микрофону! Проверьте настройки разрешений в браузере.");
-            return;
-        }
-
-        // Создание PeerJS с обработкой ошибок
-        // Находим строку peer = new Peer(); и заменяем на это:
-        peer = new Peer({
-            host: '0.peerjs.com', // Используем конкретный сервер
-            port: 443,
-            secure: true,
-            debug: 3,
-            config: {
-                'iceServers': [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            }
-        });
-
-        peer.on('open', (myId) => {
-            console.log("Мой ID в сети:", myId);
-            document.getElementById('setup-ui').style.display = 'none';
-            document.getElementById('room-ui').style.display = 'block';
-            document.getElementById('roomTitle').innerText = "#" + roomName;
-
-            const roomRef = db.ref('rooms/' + roomName);
-            roomRef.child(myId).set(true);
-            roomRef.child(myId).onDisconnect().remove();
-
-            roomRef.on('child_added', (snap) => {
-                const otherId = snap.key;
-                if (otherId !== myId && !activeCalls[otherId]) {
-                    connectToUser(otherId);
-                }
+            
+            // ИСПРАВЛЕННЫЙ БЛОК PEER
+            peer = new Peer({
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
             });
-            setupVoiceIndicator(localStream, 'my-card');
-        });
 
-        peer.on('call', (call) => {
-            call.answer(localStream);
-            handleStream(call);
-        });
+            peer.on('open', (id) => {
+                document.getElementById('setup').style.display = 'none';
+                document.getElementById('room').style.display = 'block';
+                document.getElementById('title').innerText = "#" + room;
 
-        peer.on('error', (err) => {
-            console.error("PeerJS error:", err);
-            btn.innerText = "ОШИБКА СЕТИ";
-            btn.disabled = false;
-            alert("Ошибка сети: " + err.type);
-        });
+                const ref = db.ref('rooms/' + room);
+                ref.child(id).set(true);
+                ref.child(id).onDisconnect().remove();
+
+                ref.on('child_added', (snap) => {
+                    if (snap.key !== id && !activeCalls[snap.key]) {
+                        const call = peer.call(snap.key, localStream);
+                        handleCall(call);
+                    }
+                });
+            });
+
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                handleCall(call);
+            });
+
+            peer.on('error', (err) => {
+                alert("Ошибка PeerJS: " + err.type);
+                location.reload();
+            });
+
+        } catch (e) {
+            alert("Ошибка доступа к микрофону!");
+        }
     }
 
-    // Остальные функции (connectToUser, handleStream, setupVoiceIndicator, toggleMute) 
-    // остаются такими же, как в прошлом сообщении.
+    function handleCall(call) {
+        activeCalls[call.peer] = call;
+        call.on('stream', (stream) => {
+            if (!document.getElementById('v-' + call.peer)) {
+                const audio = new Audio();
+                audio.id = 'v-' + call.peer;
+                audio.srcObject = stream;
+                audio.play();
+                
+                const div = document.createElement('div');
+                div.className = 'user-card';
+                div.innerText = "Голос: " + call.peer.substring(0,5);
+                document.getElementById('userList').appendChild(div);
+            }
+        });
+    }
 </script>
 </body>
 </html>
-
-
