@@ -3,76 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Account System</title>
+    <title>GoydaZvon | Unique ID</title>
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.18.0.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --primary: #ef4444; --success: #22c55e; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .window { background: var(--card); padding: 30px; border-radius: 25px; width: 350px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        h1 { color: var(--primary); letter-spacing: 2px; margin: 0 0 20px; }
-        .label { text-align: left; font-size: 0.8rem; color: #94a3b8; margin-bottom: 5px; margin-left: 5px; }
-        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
-        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
-        .user-card { background: #0f172a; padding: 20px; border-radius: 20px; border: 3px solid transparent; transition: 0.3s; position: relative; }
-        .user-card.speaking { border-color: var(--success); box-shadow: 0 0 15px rgba(34, 197, 94, 0.3); }
-        .username { font-weight: bold; font-size: 0.9rem; margin-top: 10px; color: #f1f5f9; }
-        .controls { display: flex; gap: 10px; margin-top: 25px; }
-        .btn-mute { background: #475569; flex: 1; }
-        .btn-mute.muted { background: #ef4444; }
-        .btn-exit { background: #334155; flex: 1; }
+        :root { --bg: #313338; --card: #2b2d31; --primary: #5865f2; --success: #23a559; --error: #da373c; --text: #dbdee1; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .window { background: var(--card); padding: 32px; border-radius: 8px; width: 340px; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
+        h1 { font-size: 24px; margin-bottom: 20px; color: white; font-weight: 800; letter-spacing: 1px; }
+        .label { text-align: left; font-size: 12px; font-weight: bold; text-transform: uppercase; color: #b5bac1; margin-bottom: 8px; }
+        input { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 3px; border: none; background: #1e1f22; color: white; box-sizing: border-box; font-size: 16px; }
+        input:focus { outline: 2px solid var(--primary); }
+        button { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 3px; color: white; font-size: 16px; font-weight: 500; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        button:hover { background: #4752c4; }
+        button:disabled { background: #4e5058; cursor: not-allowed; }
+        .user-list { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+        .user-card { background: #232428; padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 12px; transition: 0.2s; border-left: 4px solid transparent; }
+        .user-card.speaking { border-left-color: var(--success); background: #2e3035; }
+        .avatar { width: 35px; height: 35px; background: #5865f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; flex-shrink: 0; }
+        .nick { font-weight: 600; color: white; font-size: 15px; }
+        .controls { display: flex; gap: 10px; margin-top: 20px; background: #1e1f22; padding: 10px; border-radius: 8px; }
+        .btn-icon { background: transparent; padding: 5px; font-size: 22px; flex: 1; border: none; color: white; cursor: pointer; border-radius: 4px; }
+        .btn-icon:hover { background: #35373c; }
+        #error-msg { color: var(--error); font-size: 13px; margin-bottom: 15px; display: none; background: rgba(218, 55, 60, 0.1); padding: 8px; border-radius: 4px; text-align: left; }
     </style>
 </head>
 <body>
 
 <div id="setup" class="window">
     <h1>GOYDAZVON</h1>
-    <div class="label">Название комнаты:</div>
-    <input type="text" id="roomInput" placeholder="goyda1" value="goyda1">
-    <div class="label">Ваше имя (русский поддерживается):</div>
-    <input type="text" id="nameInput" placeholder="Напр. Иван">
-    <button onclick="join()">ВОЙТИ В АККАУНТ</button>
+    <div id="error-msg">⚠️ Это имя уже занято в сети!</div>
+    <div class="label">Комната</div>
+    <input type="text" id="roomInput" value="goyda-main">
+    <div class="label">Твой уникальный логин</div>
+    <input type="text" id="nameInput" placeholder="Напр: Maxim">
+    <button id="joinBtn" onclick="join()">ВОЙТИ</button>
 </div>
 
-<div id="room" class="window" style="display:none">
-    <h3 id="roomTitle"># комната</h3>
-    <div class="user-grid" id="userList">
+<div id="room" class="window" style="display:none; width: 380px;">
+    <div class="label" id="roomTitle">Голосовой канал</div>
+    <div class="user-list" id="userList">
         <div class="user-card" id="local-user">
-            <div style="font-size: 2.5rem;">👤</div>
-            <div class="username" id="local-name">Вы</div>
+            <div class="avatar" id="local-avatar">?</div>
+            <div class="nick" id="local-nick">Вы</div>
         </div>
     </div>
     <div class="controls">
-        <button id="muteBtn" class="btn-mute" onclick="toggleMute()">🎙️ Mute</button>
-        <button class="btn-exit" onclick="location.reload()">❌ Выйти</button>
+        <button id="muteBtn" class="btn-icon" onclick="toggleMute()">🎙️</button>
+        <button class="btn-icon" onclick="location.reload()">❌</button>
     </div>
 </div>
 
 <script>
-    // 1. Конфиг (Берем твой Firebase и Agora)
     const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    
     const APP_ID = "0a8621015fe0434698d14bd83b1fde91"; 
-
     const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     let localTracks = { audioTrack: null };
     let isMuted = false;
 
-    // СИСТЕМА АККАУНТОВ: Проверяем наличие сохраненного имени
     window.onload = () => {
-        const savedName = localStorage.getItem('goyda_name');
-        if (savedName) document.getElementById('nameInput').value = savedName;
+        const saved = localStorage.getItem('goyda_unique_nick');
+        if (saved) document.getElementById('nameInput').value = saved;
     };
 
-    function addUserCard(uid, name) {
+    function addUserCard(uid, nick) {
         if (document.getElementById(`user-${uid}`)) return;
         const card = document.createElement('div');
         card.id = `user-${uid}`;
         card.className = 'user-card';
-        card.innerHTML = `<div style="font-size: 2.5rem;">📢</div><div class="username">${name}</div>`;
+        card.innerHTML = `
+            <div class="avatar" style="background: #e67e22">${nick[0].toUpperCase()}</div>
+            <div class="nick">${nick}</div>
+        `;
         document.getElementById('userList').appendChild(card);
     }
 
@@ -80,42 +86,46 @@
         if (!localTracks.audioTrack) return;
         isMuted = !isMuted;
         await localTracks.audioTrack.setEnabled(!isMuted);
-        const btn = document.getElementById('muteBtn');
-        btn.innerText = isMuted ? "🔇 Unmute" : "🎙️ Mute";
-        btn.classList.toggle('muted', isMuted);
-        document.getElementById('local-user').style.opacity = isMuted ? "0.5" : "1";
+        document.getElementById('muteBtn').innerText = isMuted ? "🔇" : "🎙️";
+        document.getElementById('local-user').style.opacity = isMuted ? "0.4" : "1";
     }
 
     async function join() {
         const room = document.getElementById('roomInput').value.trim();
-        const myName = document.getElementById('nameInput').value.trim();
-        
-        if (!room || !myName) return alert("Введите имя и комнату!");
+        const nick = document.getElementById('nameInput').value.trim();
+        const btn = document.getElementById('joinBtn');
+        const errorEl = document.getElementById('error-msg');
 
-        // Сохраняем имя в память браузера (Аккаунт)
-        localStorage.setItem('goyda_name', myName);
+        if (!room || !nick) return alert("Заполни поля!");
+        btn.disabled = true;
+        errorEl.style.display = 'none';
 
-        document.getElementById('setup').style.display = 'none';
-        document.getElementById('room').style.display = 'block';
-        document.getElementById('roomTitle').innerText = "# " + room;
-        document.getElementById('local-name').innerText = myName;
+        // 1. Проверка уникальности
+        const snapshot = await db.ref(`rooms/${room}/users`).once('value');
+        const users = snapshot.val() || {};
+        const taken = Object.values(users).some(u => u.name.toLowerCase() === nick.toLowerCase());
 
+        if (taken) {
+            errorEl.style.display = 'block';
+            btn.disabled = false;
+            return;
+        }
+
+        // 2. Вход
+        localStorage.setItem('goyda_unique_nick', nick);
         try {
             const uid = await client.join(APP_ID, room, null, null);
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('room').style.display = 'block';
+            document.getElementById('roomTitle').innerText = "# " + room;
+            document.getElementById('local-nick').innerText = nick;
+            document.getElementById('local-avatar').innerText = nick[0].toUpperCase();
 
-            // Синхронизация: Получаем имена тех, кто уже в сети
-            db.ref(`rooms/${room}/users`).once('value', (snap) => {
-                const users = snap.val();
-                if (users) {
-                    Object.keys(users).forEach(u => {
-                        if (u != uid) addUserCard(u, users[u].name);
-                    });
-                }
-            });
-
-            // Регистрация своего имени в Firebase
-            db.ref(`rooms/${room}/users/${uid}`).set({ name: myName });
+            db.ref(`rooms/${room}/users/${uid}`).set({ name: nick });
             db.ref(`rooms/${room}/users/${uid}`).onDisconnect().remove();
+
+            // Показываем тех, кто уже в канале
+            Object.keys(users).forEach(id => addUserCard(id, users[id].name));
 
             localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
             await client.publish([localTracks.audioTrack]);
@@ -132,22 +142,19 @@
                 await client.subscribe(user, mediaType);
                 if (mediaType === "audio") {
                     user.audioTrack.play();
-                    // Ждем запись имени в БД другим юзером
                     setTimeout(() => {
-                        db.ref(`rooms/${room}/users/${user.uid}`).once('value', (s) => {
-                            const d = s.val();
-                            addUserCard(user.uid, d ? d.name : "Пользователь");
+                        db.ref(`rooms/${room}/users/${user.uid}`).once('value', s => {
+                            if (s.val()) addUserCard(user.uid, s.val().name);
                         });
                     }, 1500);
                 }
             });
 
-            client.on("user-left", (user) => {
+            client.on("user-left", user => {
                 document.getElementById(`user-${user.uid}`)?.remove();
             });
-
         } catch (e) {
-            console.error(e);
+            btn.disabled = false;
             alert("Ошибка входа!");
         }
     }
