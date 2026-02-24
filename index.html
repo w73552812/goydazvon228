@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Video & Voice</title>
+    <title>GoydaZvon | Video & Unique ID</title>
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.18.0.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -14,36 +14,32 @@
         h1 { font-size: 24px; margin-bottom: 20px; color: white; font-weight: 800; }
         .label { text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #b5bac1; margin-bottom: 5px; }
         input { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 3px; border: none; background: #1e1f22; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 3px; color: white; font-weight: 500; cursor: pointer; transition: 0.2s; }
-        button:disabled { background: #4e5058; cursor: not-allowed; }
+        button { width: 100%; padding: 12px; background: var(--primary); border: none; border-radius: 3px; color: white; font-weight: 500; cursor: pointer; }
+        button:disabled { background: #4e5058; }
 
-        /* Сетка видео */
-        .video-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 20px; max-height: 60vh; overflow-y: auto; padding-right: 5px; }
-        .user-container { background: #232428; border-radius: 8px; overflow: hidden; position: relative; border: 2px solid transparent; transition: 0.2s; }
+        .video-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 20px; max-height: 65vh; overflow-y: auto; }
+        .user-container { background: #232428; border-radius: 8px; overflow: hidden; border: 2px solid transparent; }
         .user-container.speaking { border-color: var(--success); }
-        
-        .video-player { width: 100%; height: 200px; background: #000; position: relative; }
-        .user-info { padding: 8px; display: flex; align-items: center; justify-content: space-between; background: #232428; }
+        .video-player { width: 100%; height: 200px; background: #000; }
+        .user-info { padding: 8px; display: flex; align-items: center; justify-content: space-between; }
         .nick { font-weight: 600; font-size: 14px; color: white; }
         
         .controls { display: flex; gap: 8px; margin-top: 20px; background: #1e1f22; padding: 10px; border-radius: 8px; }
         .btn-icon { background: #4e5058; padding: 10px; font-size: 20px; flex: 1; border: none; color: white; cursor: pointer; border-radius: 4px; }
         .btn-icon.active { background: var(--primary); }
         .btn-icon.off { background: var(--error); }
-        
         #error-msg { color: var(--error); font-size: 13px; margin-bottom: 10px; display: none; }
-        input[type=range] { width: 60px; accent-color: var(--primary); }
     </style>
 </head>
 <body>
 
 <div id="setup" class="window">
     <h1>GOYDAZVON</h1>
-    <div id="error-msg">⚠️ Имя уже занято!</div>
+    <div id="error-msg">⚠️ Это имя уже занято!</div>
     <div class="label">Комната</div>
     <input type="text" id="roomInput" value="goyda-main">
     <div class="label">Твой уникальный ник</div>
-    <input type="text" id="nameInput" placeholder="Ник...">
+    <input type="text" id="nameInput" placeholder="Введите имя...">
     <button id="joinBtn" onclick="join()">ВОЙТИ</button>
 </div>
 
@@ -52,12 +48,9 @@
     <div class="video-grid" id="userList">
         <div class="user-container" id="local-user-container">
             <div id="local-player" class="video-player"></div>
-            <div class="user-info">
-                <span class="nick" id="local-nick">Вы</span>
-            </div>
+            <div class="user-info"><span class="nick" id="local-nick">Вы</span></div>
         </div>
     </div>
-    
     <div class="controls">
         <button id="muteBtn" class="btn-icon active" onclick="toggleMute()">🎙️</button>
         <button id="videoBtn" class="btn-icon active" onclick="toggleVideo()">📷</button>
@@ -69,7 +62,6 @@
     const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    
     const APP_ID = "0a8621015fe0434698d14bd83b1fde91"; 
     const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     
@@ -91,7 +83,7 @@
             <div id="player-${uid}" class="video-player"></div>
             <div class="user-info">
                 <span class="nick">${nick}</span>
-                <input type="range" min="0" max="100" value="100" id="vol-${uid}" title="Громкость">
+                <input type="range" min="0" max="100" value="100" id="vol-${uid}" style="width:60px; accent-color:#5865f2">
             </div>
         `;
         document.getElementById('userList').appendChild(container);
@@ -107,8 +99,7 @@
         isMuted = !isMuted;
         await localTracks.audioTrack.setEnabled(!isMuted);
         document.getElementById('muteBtn').innerText = isMuted ? "🔇" : "🎙️";
-        document.getElementById('muteBtn').classList.toggle('active', !isMuted);
-        document.getElementById('muteBtn').classList.toggle('off', isMuted);
+        document.getElementById('muteBtn').className = isMuted ? 'btn-icon off' : 'btn-icon active';
     }
 
     async function toggleVideo() {
@@ -116,8 +107,7 @@
         isVideoOff = !isVideoOff;
         await localTracks.videoTrack.setEnabled(!isVideoOff);
         document.getElementById('videoBtn').innerText = isVideoOff ? "🚫" : "📷";
-        document.getElementById('videoBtn').classList.toggle('active', !isVideoOff);
-        document.getElementById('videoBtn').classList.toggle('off', isVideoOff);
+        document.getElementById('videoBtn').className = isVideoOff ? 'btn-icon off' : 'btn-icon active';
     }
 
     async function join() {
@@ -147,10 +137,7 @@
             db.ref(`rooms/${room}/users/${uid}`).set({ name: nick });
             db.ref(`rooms/${room}/users/${uid}`).onDisconnect().remove();
 
-            // Создаем аудио и видео треки
             [localTracks.audioTrack, localTracks.videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-            
-            // Показываем свое видео
             localTracks.videoTrack.play('local-player');
             await client.publish(Object.values(localTracks));
 
@@ -177,10 +164,9 @@
             });
 
             client.on("user-left", user => document.getElementById(`user-${user.uid}`)?.remove());
-
         } catch (e) {
             console.error(e);
-            alert("Нужен доступ к камере и микрофону!");
+            alert("Нужен доступ к камере!");
             btn.disabled = false;
         }
     }
