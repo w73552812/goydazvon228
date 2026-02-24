@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoydaZvon | Voice Discord Mode</title>
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --primary: #ef4444;
+            --success: #22c55e;
+            --text: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .window {
+            background: var(--card);
+            padding: 30px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid #334155;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 { color: var(--primary); letter-spacing: 2px; text-transform: uppercase; margin-top: 0; }
+        
+        input {
+            width: 100%;
+            padding: 14px;
+            margin: 20px 0;
+            border-radius: 12px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            box-sizing: border-box;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus { border-color: var(--primary); }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s;
+            color: white;
+        }
+
+        .btn-primary { background: var(--primary); }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Сетка участников */
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .user-card {
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 18px;
+            border: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        /* Анимация когда кто-то говорит */
+        .user-card.speaking {
+            border-color: var(--success);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+            transform: scale(1.05);
+        }
+
+        .avatar { font-size: 2.5rem; margin-bottom: 10px; display: block; }
+        .username { font-size: 0.8rem; opacity: 0.7; font-family: monospace; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-mute { background: #475569; flex: 3; }
+        .btn-mute.active { background: var(--primary); }
+        .btn-exit { background: #334155; flex: 1; }
+    </style>
+</head>
+<body>
+
+<div class="window" id="setup-ui">
+    <h1>GOYDAZVON</h1>
+    <p>Введите название комнаты для общения</p>
+    <input type="text" id="roomInput" placeholder="Например: goyda1" value="goyda1">
+    <button class="btn btn-primary" onclick="startGoyda()">ВОЙТИ В ГОЛОС</button>
+</div>
+
+<div class="window" id="room-ui" style="display:none">
+    <h2 id="roomTitle" style="margin-bottom: 5px;"># комната</h2>
+    <div id="status-msg" style="font-size: 0.7rem; color: var(--success); margin-bottom: 20px;">Подключено</div>
+    
+    <div class="user-grid" id="userList">
+        <div class="user-card" id="my-card">
+            <span class="avatar">👤</span>
+            <span class="username">ВЫ</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button id="mute-btn" class="btn btn-mute" onclick="toggleMute()">🎙️ МИК ВКЛ</button>
+        <button class="btn btn-exit" onclick="location.reload()">❌</button>
+    </div>
+</div>
+
+<script>
+    // --- НАСТРОЙКИ ---
+    const firebaseConfig = {
+        databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let localStream;
+    let peer;
+    let audioContext;
+    let isMuted = false;
+    const activeCalls = {};
+
+    // --- ЛОГИКА ---
+
+    async function startGoyda() {
+        const roomName = document.getElementById('roomInput').value.trim();
+        if(!roomName) return alert("Нужно имя комнаты!");
+
+        // Инициализируем аудио для обхода блокировок браузера
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            return alert("Ошибка: Микрофон не доступен. Проверьте HTTPS!");
+        }
+
+        // Создаем Peer соединение
+        peer = new Peer();
+
+        peer.on('open', (myId) => {
+            document.getElementById('setup-ui').style.display = 'none';
+            document.getElementById('room-ui').style.display = 'block';
+            document.getElementById('roomTitle').innerText = "# " + roomName;
+
+            // Регистрируемся в Firebase
+            const roomRef = db.ref('rooms/' + roomName);
+            roomRef.child(myId).set(true);
+            roomRef.child(myId).onDisconnect().remove();
+
+            // Следим за новыми участниками
+            roomRef.on('child_added', (snapshot) => {
+                const otherId = snapshot.key;
+                if (otherId !== myId && !activeCalls[otherId]) {
+                    const call = peer.call(otherId, localStream);
+                    setupCall(call);
+                }
+            });
+            
+            // Запускаем индикатор для себя
+            setupVoiceIndicator(localStream, 'my-card');
+        });
+
+        // Ответ на входящие
+        peer.on('call', (call) => {
+            call.answer(localStream);
+            setupCall(call);
+        });
+    }
+
+    function setupCall(call) {
+        if (activeCalls[call.peer]) return;
+        activeCalls[call.peer] = call;
+
+        call.on('stream', (remoteStream) => {
+            if (!document.getElementById('audio-' + call.peer)) {
+                // Создаем звук
+                const audio = new Audio();
+                audio.id = 'audio-' + call.peer;
+                audio.srcObject = remoteStream;
+                audio.play().catch(console.error);
+
+                // Создаем карточку юзера
+                const card = document.createElement('div');
+                card.id = 'card-' + call.peer;
+                card.className = 'user-card';
+                card.innerHTML = `<span class="avatar">📢</span><span class="username">${call.peer.substring(0,5)}</span>`;
+                document.getElementById('userList').appendChild(card);
+
+                // Запускаем подсветку голоса
+                setupVoiceIndicator(remoteStream, card.id);
+            }
+        });
+
+        call.on('close', () => {
+            document.getElementById('card-' + call.peer)?.remove();
+            document.getElementById('audio-' + call.peer)?.remove();
+            delete activeCalls[call.peer];
+        });
+    }
+
+    function setupVoiceIndicator(stream, cardId) {
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        function update() {
+            if (!document.getElementById(cardId)) return;
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for(let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+
+            const card = document.getElementById(cardId);
+            // Если громкость выше 12 — красим в зеленый
+            if (avg > 12) card.classList.add('speaking');
+            else card.classList.remove('speaking');
+
+            requestAnimationFrame(update);
+        }
+        update();
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        localStream.getAudioTracks()[0].enabled = !isMuted;
+        
+        const btn = document.getElementById('mute-btn');
+        btn.innerText = isMuted ? "🔇 МИК ВЫКЛ" : "🎙️ МИК ВКЛ";
+        btn.classList.toggle('active', isMuted);
+    }
+</script>
+
+</body>
+</html>
