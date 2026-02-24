@@ -1,46 +1,9 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | Advanced Engine</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        :root { --bg: #0f172a; --primary: #ef4444; --success: #22c55e; --text: #f1f5f9; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .window { background: #1e293b; padding: 30px; border-radius: 24px; width: 350px; text-align: center; border: 1px solid #334155; }
-        h1 { color: var(--primary); letter-spacing: 2px; }
-        input { width: 100%; padding: 14px; margin: 15px 0; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
-        .user-card { background: #0f172a; padding: 15px; border-radius: 15px; border: 2px solid transparent; }
-        .user-card.active { border-color: var(--success); }
-    </style>
-</head>
-<body>
-
-<div id="setup" class="window">
-    <h1>GOYDAZVON</h1>
-    <input type="text" id="roomName" placeholder="Комната" value="goyda1">
-    <button onclick="initCall()">ВОЙТИ В СЕТЬ</button>
-</div>
-
-<div id="room" class="window" style="display:none">
-    <h2 id="title"></h2>
-    <div class="user-grid" id="userList">
-        <div class="user-card" id="my-card">👤<br>ВЫ</div>
-    </div>
-    <button onclick="location.reload()" style="margin-top:20px; background:#475569">ВЫЙТИ</button>
-</div>
-
-<script>
-    const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
+const firebaseConfig = { databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let myId = Math.random().toString(36).substr(2, 9);
+    // Генерируем ID и добавляем к нему метку устройства для отладки
+    let myId = (navigator.userAgent.match(/iPhone|Android/i) ? 'mob-' : 'pc-') + Math.random().toString(36).substr(2, 5);
     let localStream;
     let peers = {};
 
@@ -53,50 +16,56 @@
             document.getElementById('title').innerText = "# " + room;
 
             const roomRef = db.ref('rooms/' + room);
+            const signalRef = db.ref('signals/' + myId);
 
-            // Сообщаем всем, что мы зашли
-            roomRef.child(myId).set({ active: true });
+            // 1. Очищаем свои старые сигналы перед входом
+            await signalRef.remove();
+
+            // 2. Регистрируем себя в комнате
+            roomRef.child(myId).set(true);
             roomRef.child(myId).onDisconnect().remove();
 
-            // Слушаем других участников
+            // 3. Когда кто-то ЗАХОДИТ (child_added)
             roomRef.on('child_added', snapshot => {
                 const userId = snapshot.key;
-                if (userId !== myId) {
-                    initPeer(userId, room, true); // Мы создаем предложение (initiator)
+                // Инициатором будет тот, чей ID "меньше" по алфавиту (стандартный трюк WebRTC)
+                if (userId !== myId && !peers[userId]) {
+                    const isInitiator = myId < userId; 
+                    initPeer(userId, room, isInitiator);
                 }
             });
 
-            // Слушаем сигналы (ответы)
-            db.ref('signals/' + myId).on('child_added', snapshot => {
+            // 4. Слушаем входящие сигналы
+            signalRef.on('child_added', snapshot => {
                 const data = snapshot.val();
                 if (peers[data.from]) {
                     peers[data.from].signal(data.signal);
                 } else {
-                    // Если нам пришел сигнал от того, кого мы еще не знаем — создаем пира (не инициатор)
+                    // Если пира нет, создаем его (не инициатор, так как нам прислали сигнал)
                     const p = initPeer(data.from, room, false);
                     p.signal(data.signal);
                 }
-                snapshot.ref.remove();
+                snapshot.ref.remove(); // Удаляем обработанный сигнал
             });
 
-        } catch (e) { alert("Микрофон не доступен!"); }
+        } catch (e) { alert("Ошибка микрофона: " + e.message); }
     }
 
     function initPeer(userId, room, initiator) {
-        if (peers[userId]) return peers[userId];
-
+        console.log(`Создаю пир с ${userId}. Я инициатор: ${initiator}`);
+        
         const p = new SimplePeer({
             initiator: initiator,
             stream: localStream,
-            trickle: false,
+            trickle: false, // Для Firebase лучше false (один большой пакет данных)
             config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
         });
 
         p.on('signal', data => {
-            // Отправляем наш сигнал другому через Firebase
+            // Отправляем сигнал напрямую в ветку получателя
             db.ref('signals/' + userId).push({
                 from: myId,
-                signal: data
+                signal: JSON.stringify(data) // Сериализуем для надежности
             });
         });
 
@@ -110,23 +79,23 @@
                 const card = document.createElement('div');
                 card.className = 'user-card active';
                 card.id = 'c-' + userId;
-                card.innerHTML = "📢<br>" + userId.substr(0, 4);
+                card.innerHTML = `📢<br><small>${userId}</small>`;
                 document.getElementById('userList').appendChild(card);
             }
         });
 
-        p.on('close', () => removeUser(userId));
-        p.on('error', err => console.error('Peer error:', err));
+        p.on('close', () => {
+            document.getElementById('c-' + userId)?.remove();
+            delete peers[userId];
+        });
+
+        // Исправление: если пришел сигнал в виде строки, парсим его
+        const originalSignal = p.signal;
+        p.signal = function(data) {
+            if (typeof data === 'string') return originalSignal.call(this, JSON.parse(data));
+            return originalSignal.call(this, data);
+        };
 
         peers[userId] = p;
         return p;
     }
-
-    function removeUser(id) {
-        document.getElementById('c-' + id)?.remove();
-        document.getElementById('v-' + id)?.remove();
-        delete peers[id];
-    }
-</script>
-</body>
-</html>
