@@ -3,221 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon Pro | Voice & Files</title>
-    
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
+    <title>GoydaZvon | Powered by Jitsi</title>
+    <script src="https://8x8.vc/external_api.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --primary: #ef4444; --success: #22c55e; --text: #f1f5f9; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .window { background: var(--card); padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h1 { color: var(--primary); letter-spacing: 2px; margin-top: 0; font-size: 1.5rem; }
-        input { width: 100%; padding: 12px; margin: 15px 0; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
-        .btn { width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; }
-        .btn-primary { background: var(--primary); }
-        .user-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0; }
-        .user-card { background: #0f172a; padding: 15px; border-radius: 15px; border: 2px solid transparent; transition: 0.3s; position: relative; }
-        .user-card.speaking { border-color: var(--success); box-shadow: 0 0 15px rgba(34, 197, 94, 0.3); }
-        .controls { display: flex; gap: 8px; margin-top: 15px; }
-        .btn-tool { background: #475569; flex: 1; font-size: 1.1rem; padding: 10px; }
-        .btn-mute.active { background: var(--primary); }
-        #log { color: #fca5a5; font-size: 0.75rem; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 5px; display: none; }
-        .file-box { font-size: 0.7rem; background: var(--success); color: white; padding: 4px; border-radius: 4px; display: block; margin-top: 8px; text-decoration: none; }
+        :root { --bg: #0b0e14; --primary: #ef4444; --text: #ffffff; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); font-family: sans-serif; }
+        
+        #setup-ui {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; text-align: center; color: var(--text);
+        }
+        
+        .card { background: #1e293b; padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; }
+        h1 { color: var(--primary); margin-bottom: 20px; letter-spacing: 2px; }
+        input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: #0f172a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: var(--primary); border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; }
+        
+        #meet-container { width: 100%; height: 100vh; display: none; }
     </style>
 </head>
 <body>
 
-<div class="window" id="setup-ui">
-    <h1>GOYDAZVON</h1>
-    <input type="text" id="roomInput" placeholder="Имя комнаты" value="goyda1">
-    <button class="btn btn-primary" id="startBtn" onclick="startGoyda()">ВОЙТИ В КАНАЛ</button>
-    <div id="log"></div>
+<div id="setup-ui">
+    <div class="card">
+        <h1>GOYDAZVON</h1>
+        <p>Введите имя комнаты</p>
+        <input type="text" id="roomName" placeholder="Например: goyda_party" value="goyda1">
+        <button onclick="startMeeting()">ЗАЙТИ В КАНАЛ</button>
+    </div>
 </div>
 
-<div class="window" id="room-ui" style="display:none">
-    <h2 id="roomTitle" style="margin: 0; font-size: 1.2rem;"></h2>
-    <div class="user-grid" id="userList">
-        <div class="user-card" id="my-card">
-            <div style="font-size: 2rem;">👤</div>
-            <div style="font-size: 0.7rem; opacity: 0.7;">ВЫ</div>
-        </div>
-    </div>
-    <div class="controls">
-        <button id="mute-btn" class="btn btn-tool" onclick="toggleMute()">🎙️</button>
-        <label class="btn btn-tool" style="cursor:pointer">
-            📎 <input type="file" id="fileInput" onchange="sendFile()" style="display:none">
-        </label>
-        <button class="btn btn-tool" style="background:#334155" onclick="location.reload()">❌</button>
-    </div>
-</div>
+<div id="meet-container"></div>
 
 <script>
-    const firebaseConfig = {
-        databaseURL: "https://goydazvon-e4140-default-rtdb.europe-west1.firebasedatabase.app/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    function startMeeting() {
+        const roomName = document.getElementById('roomName').value.trim();
+        if (!roomName) return alert("Введите имя комнаты!");
 
-    let localStream, peer, audioContext, isMuted = false;
-    const activeCalls = {};
+        document.getElementById('setup-ui').style.display = 'none';
+        document.getElementById('meet-container').style.display = 'block';
 
-    function showLog(msg) {
-        const log = document.getElementById('log');
-        log.style.display = 'block';
-        log.innerText = msg;
-    }
-
-    async function startGoyda() {
-        const roomName = document.getElementById('roomInput').value.trim();
-        const startBtn = document.getElementById('startBtn');
-        if(!roomName) return;
-
-        startBtn.innerText = "ПОДКЛЮЧЕНИЕ...";
-        startBtn.disabled = true;
-
-        try {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-            startBtn.disabled = false;
-            startBtn.innerText = "ВОЙТИ В КАНАЛ";
-            return showLog("Ошибка: Микрофон заблокирован. Разрешите доступ в настройках браузера.");
-        }
-
-        // Настройки PeerJS для максимальной стабильности
-        peer = new Peer(null, {
-            host: '0.peerjs.com',
-            port: 443,
-            secure: true,
-            debug: 3,
-            config: {
-                'iceServers': [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' }
-                ]
+        const domain = "8x8.vc"; // Или meet.jit.si
+        const options = {
+            roomName: "vpaas-magic-cookie-43b6e86488d54d1fb868b446a81b2292/" + roomName,
+            width: "100%",
+            height: "100%",
+            parentNode: document.querySelector('#meet-container'),
+            lang: 'ru',
+            interfaceConfigOverwrite: {
+                TOOLBAR_BUTTONS: [
+                    'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+                    'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
+                    'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+                    'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
+                    'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
+                    'security'
+                ],
             }
-        });
-
-        peer.on('open', (myId) => {
-            document.getElementById('setup-ui').style.display = 'none';
-            document.getElementById('room-ui').style.display = 'block';
-            document.getElementById('roomTitle').innerText = "# " + roomName;
-
-            const roomRef = db.ref('rooms/' + roomName);
-            roomRef.child(myId).set(true);
-            roomRef.child(myId).onDisconnect().remove();
-
-            roomRef.on('child_added', (snap) => {
-                const otherId = snap.key;
-                if (otherId !== myId && !activeCalls[otherId]) {
-                    const call = peer.call(otherId, localStream);
-                    handleCall(call);
-                }
-            });
-            setupVoiceIndicator(localStream, 'my-card');
-        });
-
-        peer.on('call', (call) => {
-            call.answer(localStream);
-            handleCall(call);
-        });
-
-        peer.on('connection', (conn) => {
-            conn.on('data', (data) => {
-                if (data.file) {
-                    const blob = new Blob([data.file], { type: data.fileType });
-                    const url = URL.createObjectURL(blob);
-                    const card = document.getElementById('card-' + conn.peer) || document.getElementById('my-card');
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = data.fileName;
-                    link.className = 'file-box';
-                    link.innerText = "📥 " + data.fileName;
-                    card.appendChild(link);
-                }
-            });
-        });
-
-        peer.on('error', (err) => {
-            console.error(err);
-            if(err.type === 'server-error') {
-                showLog("Ошибка сети у PeerJS. Попробуй обновить страницу.");
-            } else {
-                showLog("Ошибка: " + err.type);
-            }
-            startBtn.disabled = false;
-            startBtn.innerText = "ОШИБКА. ПОВТОРИТЬ?";
-        });
-    }
-
-    function handleCall(call) {
-        if (activeCalls[call.peer]) return;
-        activeCalls[call.peer] = call;
-
-        call.on('stream', (stream) => {
-            if (!document.getElementById('audio-' + call.peer)) {
-                const audio = new Audio();
-                audio.id = 'audio-' + call.peer;
-                audio.srcObject = stream;
-                audio.play().catch(() => showLog("Нажми на экран, чтобы включить звук"));
-
-                const card = document.createElement('div');
-                card.id = 'card-' + call.peer;
-                card.className = 'user-card';
-                card.innerHTML = `<div style="font-size: 2rem;">📢</div><div style="font-size: 0.6rem;">${call.peer.substring(0,4)}</div>`;
-                document.getElementById('userList').appendChild(card);
-                setupVoiceIndicator(stream, card.id);
-            }
-        });
-
-        call.on('close', () => {
-            document.getElementById('card-' + call.peer)?.remove();
-            document.getElementById('audio-' + call.peer)?.remove();
-            delete activeCalls[call.peer];
-        });
-    }
-
-    function setupVoiceIndicator(stream, cardId) {
-        const source = audioContext.createMediaStreamSource(stream);
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        function frame() {
-            if (!document.getElementById(cardId)) return;
-            analyser.getByteFrequencyData(dataArray);
-            const avg = dataArray.reduce((a, b) => a + b) / dataArray.length;
-            const card = document.getElementById(cardId);
-            if (avg > 15) card.classList.add('speaking');
-            else card.classList.remove('speaking');
-            requestAnimationFrame(frame);
-        }
-        frame();
-    }
-
-    function toggleMute() {
-        isMuted = !isMuted;
-        localStream.getAudioTracks()[0].enabled = !isMuted;
-        const btn = document.getElementById('mute-btn');
-        btn.classList.toggle('active', isMuted);
-        btn.innerText = isMuted ? "🔇" : "🎙️";
-    }
-
-    function sendFile() {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return;
-        Object.keys(activeCalls).forEach(id => {
-            const conn = peer.connect(id);
-            conn.on('open', () => {
-                conn.send({ file, fileName: file.name, fileType: file.type });
-            });
-        });
-        alert("Файл отправляется...");
+        };
+        const api = new JitsiMeetExternalAPI(domain, options);
     }
 </script>
 </body>
