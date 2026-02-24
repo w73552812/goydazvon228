@@ -51,7 +51,7 @@
     const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     let localTracks = { audioTrack: null };
 
-    async function join() {
+   async function join() {
         const room = document.getElementById('roomInput').value;
         const myName = document.getElementById('nameInput').value;
         
@@ -60,18 +60,30 @@
         document.getElementById('roomTitle').innerText = "# " + room;
         document.getElementById('local-name').innerText = myName;
 
-        // Присоединяемся
+        // 1. Присоединяемся к Agora
         const uid = await client.join(APP_ID, room, null, null);
 
-        // Сохраняем имя в Firebase
+        // 2. Сначала загружаем список ВСЕХ, кто уже в комнате (чтобы видеть первого)
+        db.ref(`rooms/${room}/users`).once('value', (snapshot) => {
+            const users = snapshot.val();
+            if (users) {
+                Object.keys(users).forEach(remoteUid => {
+                    if (remoteUid != uid) {
+                        addUserCard(remoteUid, users[remoteUid].name);
+                    }
+                });
+            }
+        });
+
+        // 3. Сохраняем СВОЕ имя в Firebase
         db.ref(`rooms/${room}/users/${uid}`).set({ name: myName });
         db.ref(`rooms/${room}/users/${uid}`).onDisconnect().remove();
 
-        // Микрофон
+        // 4. Публикуем микрофон
         localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
         await client.publish([localTracks.audioTrack]);
 
-        // Голосовая индикация
+        // 5. Голосовая индикация
         client.enableAudioVolumeIndicator();
         client.on("volume-indicator", volumes => {
             volumes.forEach(v => {
@@ -80,20 +92,27 @@
             });
         });
 
-        // Когда заходит другой
+        // 6. Когда КТО-ТО НОВЫЙ заходит (для первого пользователя)
         client.on("user-published", async (user, mediaType) => {
             await client.subscribe(user, mediaType);
             if (mediaType === "audio") {
                 user.audioTrack.play();
                 
-                // Получаем имя из Firebase
-                db.ref(`rooms/${room}/users/${user.uid}`).once('value', (snap) => {
-                    const data = snap.val();
-                    const nameToShow = data ? data.name : "Чушпан";
-                    addUserCard(user.uid, nameToShow);
-                });
+                // Ждем секунду, пока Firebase обновится, и берем имя
+                setTimeout(() => {
+                    db.ref(`rooms/${room}/users/${user.uid}`).once('value', (snap) => {
+                        const data = snap.val();
+                        const nameToShow = data ? data.name : "Подключается...";
+                        addUserCard(user.uid, nameToShow);
+                    });
+                }, 1000);
             }
         });
+
+        client.on("user-left", (user) => {
+            document.getElementById(`user-${user.uid}`)?.remove();
+        });
+    }
 
         client.on("user-left", (user) => {
             document.getElementById(`user-${user.uid}`)?.remove();
@@ -114,3 +133,4 @@
 </script>
 </body>
 </html>
+
