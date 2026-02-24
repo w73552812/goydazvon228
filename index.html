@@ -8,17 +8,11 @@
     <style>
         :root { --bg: #0b0e14; --primary: #ef4444; --text: #ffffff; }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg); font-family: sans-serif; }
-        
-        #setup-ui {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; text-align: center; color: var(--text);
-        }
-        
-        .card { background: #1e293b; padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; }
-        h1 { color: var(--primary); margin-bottom: 20px; letter-spacing: 2px; }
-        input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: #0f172a; color: white; box-sizing: border-box; }
+        #setup-ui { display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { background: #1e293b; padding: 40px; border-radius: 24px; text-align: center; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: var(--primary); margin: 0 0 20px; letter-spacing: 2px; }
+        input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
         button { width: 100%; padding: 14px; background: var(--primary); border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; }
-        
         #meet-container { width: 100%; height: 100vh; display: none; }
     </style>
 </head>
@@ -27,8 +21,7 @@
 <div id="setup-ui">
     <div class="card">
         <h1>GOYDAZVON</h1>
-        <p>Введите имя комнаты</p>
-        <input type="text" id="roomName" placeholder="Например: goyda_party" value="goyda1">
+        <input type="text" id="roomName" placeholder="Имя комнаты" value="goyda1">
         <button onclick="startMeeting()">ЗАЙТИ В КАНАЛ</button>
     </div>
 </div>
@@ -43,23 +36,14 @@
         document.getElementById('setup-ui').style.display = 'none';
         document.getElementById('meet-container').style.display = 'block';
 
-        const domain = "8x8.vc"; // Или meet.jit.si
+        const domain = "8x8.vc"; 
         const options = {
+            // Уникальный префикс, чтобы никто чужой не зашел
             roomName: "vpaas-magic-cookie-43b6e86488d54d1fb868b446a81b2292/" + roomName,
             width: "100%",
             height: "100%",
             parentNode: document.querySelector('#meet-container'),
-            lang: 'ru',
-            interfaceConfigOverwrite: {
-                TOOLBAR_BUTTONS: [
-                    'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-                    'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
-                    'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
-                    'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
-                    'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
-                    'security'
-                ],
-            }
+            lang: 'ru'
         };
         const api = new JitsiMeetExternalAPI(domain, options);
     }
