@@ -3,55 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoydaZvon | No Login</title>
-    <script src="https://meet.jit.si/external_api.js"></script>
+    <title>GoydaZvon | No Login Edition</title>
+    <script src="https://meet.ffmuc.net/external_api.js"></script>
     <style>
-        :root { --bg: #0f172a; --primary: #ef4444; }
-        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .setup-box { background: #1e293b; padding: 30px; border-radius: 20px; text-align: center; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
-        h1 { color: var(--primary); margin-bottom: 20px; letter-spacing: 2px; }
-        input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: #0f172a; color: white; box-sizing: border-box; text-align: center; }
-        button { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
-        button:hover { opacity: 0.9; }
-        #meet { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+        body { margin: 0; background: #0f172a; font-family: sans-serif; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .setup { background: #1e293b; padding: 40px; border-radius: 24px; text-align: center; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        h1 { color: #ef4444; margin-bottom: 25px; letter-spacing: 2px; }
+        input { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 12px; border: none; background: #0f172a; color: white; box-sizing: border-box; text-align: center; font-size: 1rem; }
+        button { width: 100%; padding: 16px; background: #ef4444; border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        #meet { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #000; }
     </style>
 </head>
 <body>
 
-<div id="setup">
-    <div class="setup-box">
+<div id="setup-ui">
+    <div class="setup">
         <h1>GOYDAZVON</h1>
-        <p>Придумай имя комнаты</p>
-        <input type="text" id="roomName" placeholder="Например: super-goyda-2026" value="">
-        <button onclick="joinRoom()">СОЗДАТЬ / ВОЙТИ</button>
+        <input type="text" id="room" placeholder="Имя комнаты" value="goyda_secret_777">
+        <button onclick="start()">ВОЙТИ БЕЗ ЛОГИНА</button>
     </div>
 </div>
 
 <div id="meet"></div>
 
 <script>
-    function joinRoom() {
-        const roomInput = document.getElementById('roomName').value.trim();
-        if (!roomInput) return alert("Введите название комнаты!");
+    function start() {
+        const roomName = document.getElementById('room').value.trim();
+        if (!roomName) return alert("Введите имя комнаты!");
 
-        // Прячем меню, показываем звонок
-        document.getElementById('setup').style.display = 'none';
+        document.getElementById('setup-ui').style.display = 'none';
         document.getElementById('meet').style.display = 'block';
 
-        const domain = "meet.jit.si";
+        // Используем свободный сервер сообщества
+        const domain = "meet.ffmuc.net";
         const options = {
-            roomName: roomInput,
+            roomName: roomName,
             width: "100%",
             height: "100%",
             parentNode: document.querySelector('#meet'),
             lang: 'ru',
-            // Настройки, чтобы сразу зайти с микрофоном
             configOverwrite: {
                 startWithAudioMuted: false,
-                disableDeepLinking: true // Чтобы не заставлял скачивать приложение на телефоне
+                disableDeepLinking: true, // Не просит скачивать приложение
+                prejoinPageEnabled: false // Пропускает экран "Присоединиться" (сразу в бой)
             },
             interfaceConfigOverwrite: {
-                TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'chat', 'tileview']
+                TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'chat', 'tileview', 'settings']
             }
         };
         const api = new JitsiMeetExternalAPI(domain, options);
