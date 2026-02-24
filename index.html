@@ -70,17 +70,37 @@
         if (saved) document.getElementById('nameInput').value = saved;
     };
 
-    function addUserCard(uid, nick) {
+    // Функция отрисовки карточки с ползунком громкости
+    function addUserCard(uid, nick, userObject = null) {
         if (document.getElementById(`user-${uid}`)) return;
         const card = document.createElement('div');
         card.id = `user-${uid}`;
         card.className = 'user-card';
         card.innerHTML = `
             <div class="avatar" style="background: #e67e22">${nick[0].toUpperCase()}</div>
-            <div class="nick">${nick}</div>
-        `;
-        document.getElementById('userList').appendChild(card);
-    }
+            <div style="flex-grow: 1;">
+                <div class="nick">${nick}</div>
+                <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
+                    <span style="font-size: 10px; color: #b5bac1;">🔈</span>
+                    <input type="range" min="0" max="100" value="100" 
+                        style="margin: 0; height: 4px; accent-color: var(--primary);" 
+                        id="vol-${uid}">
+                </div>
+            </div>
+            `;
+            document.getElementById('userList').appendChild(card);
+
+            // Привязываем регулировку громкости, если объект пользователя уже есть
+            const volSlider = document.getElementById(`vol-${uid}`);
+            volSlider.oninput = (e) => {
+                const volume = parseInt(e.target.value);
+                // Находим пользователя в списке удаленных пользователей Agora
+                const remoteUser = client.remoteUsers.find(u => u.uid == uid);
+                if (remoteUser && remoteUser.audioTrack) {
+                    remoteUser.audioTrack.setVolume(volume);
+                }
+            };
+        }    
 
     async function toggleMute() {
         if (!localTracks.audioTrack) return;
@@ -161,3 +181,4 @@
 </script>
 </body>
 </html>
+
